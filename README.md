@@ -9,11 +9,13 @@ qo'ygan-qo'ymaganini aniqlashga yordam beradi.
 |------|-------|------|
 | 1. Test sahifasi (HTML) | ✅ tayyor | [`test-page/`](test-page/) |
 | 2. EDID o'quvchi (Windows, Python) | ✅ tayyor | [`edid-reader/`](edid-reader/) |
-| 3–6. Android ilova (flicker, piksellar, PDF, spektr) | ⏳ | `android-app/` |
+| 3. Android ilova: karkas + miltillash (PWM) moduli | ✅ tayyor | [`android-app/`](android-app/) |
+| 4–6. Piksellar/uniformity, PDF hisobot, spektr | ⏳ | `android-app/` |
 
 Arxitektura: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) ·
 Marker protokoli: [`docs/marker-spec.md`](docs/marker-spec.md) ·
-EDID QR formati: [`docs/edid-schema.md`](docs/edid-schema.md)
+EDID QR formati: [`docs/edid-schema.md`](docs/edid-schema.md) ·
+Metodika: [`docs/methodology.md`](docs/methodology.md)
 
 ## 1. Test sahifasi
 
