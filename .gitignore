@@ -1,2 +1,25 @@
-/myenv
-.env
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+build/
+dist/
+*.spec
+
+# Android / Gradle
+.gradle/
+local.properties
+*.iml
+.idea/
+android-app/**/build/
+captures/
+*.keystore
+*.jks
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Sinov natijalari
+test-page/tools/out/

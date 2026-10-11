@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<!--
+  MonitorCheck — monitor sifatini tekshirish uchun test sahifasi (1-bosqich)
+  ---------------------------------------------------------------------------
+  * Yagona mustaqil fayl: internet, o'rnatish, tashqi kutubxona talab qilinmaydi.
+  * Brauzerda oching va F11 (to'liq ekran) bosing.
+  * Har bir test rasmining burchaklarida ArUco (DICT_4X4_50) markerlar bor —
+    telefon ilovasi ular orqali testni taniydi va perspektivani tuzatadi.
+    Protokol: docs/marker-spec.md
+  * Barcha rasmlar <canvas> ga QURILMA PIKSELLARIDA chiziladi (devicePixelRatio
+    hisobga olinadi), shuning uchun gradient pog'onalari brauzer masshtabi
+    tomonidan "silliqlanmaydi".
+-->
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MonitorCheck — test sahifasi</title>
+<style>
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: #000; color: #e8e8e8;
+    font-family: "Segoe UI", Roboto, Arial, sans-serif;
+    overflow: hidden;
+  }
+  body.testing, body.testing * { cursor: none !important; }
+
+  /* Test rasmi: ekranni to'liq egallaydi, piksellar silliqlanmaydi */
+  #c {
+    position: fixed; left: 0; top: 0;
+    display: none;
+    image-rendering: pixelated;
+  }
+  body.testing #c { display: block; }
+
+  /* Yordam (boshlang'ich) ekrani */
+  #help {
+    position: fixed; inset: 0; overflow: auto;
+    background: #15171a; padding: 32px 16px; box-sizing: border-box;
+  }
+  body.testing #help { display: none; }
+  #help .wrap { max-width: 980px; margin: 0 auto; line-height: 1.5; }
+  #help h1 { font-size: 28px; margin: 0 0 4px; color: #fff; }
+  #help h2 { font-size: 18px; margin: 28px 0 8px; color: #9fd0ff; }
+  #help .sub { color: #a8b0b8; margin: 0 0 16px; }
+  #help table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  #help td, #help th { border-bottom: 1px solid #2c3036; padding: 6px 8px; text-align: left; vertical-align: top; }
+  #help th { color: #a8b0b8; font-weight: 600; }
+  #help kbd {
+    display: inline-block; min-width: 18px; padding: 1px 6px; margin: 1px;
+    border: 1px solid #4a5058; border-bottom-width: 2px; border-radius: 4px;
+    background: #22262b; font: 13px Consolas, monospace; color: #fff; text-align: center;
+  }
+  #help ul { margin: 6px 0; padding-left: 22px; }
+  #help .warn { color: #ffcc66; }
+  #help .ok { color: #8fe08f; }
+  #help .info { font: 14px Consolas, monospace; background: #0e1012; padding: 10px 12px; border-radius: 6px; }
+  #help .swatch { display: inline-block; width: 14px; height: 14px; border: 1px solid #555; vertical-align: -2px; margin-right: 6px; }
+  #start {
+    margin-top: 20px; padding: 12px 28px; font-size: 18px; border: 0; border-radius: 8px;
+    background: #2f81f7; color: #fff; cursor: pointer;
+  }
+  #start:hover { background: #4b93f8; }
+
+  /* Qisqa ma'lumot (test nomi) — bir necha soniyadan keyin to'liq yo'qoladi */
+  .overlay {
+    position: fixed; left: 50%; transform: translateX(-50%);
+    background: rgba(20, 22, 25, 0.88); color: #fff;
+    border: 1px solid #555; border-radius: 8px;
+    padding: 10px 18px; font-size: 16px; text-align: center;
+    pointer-events: none; display: none; max-width: 80vw;
+  }
+  #toast { bottom: 12%; }
+  #note  { top: 30%; font-size: 20px; line-height: 1.5; padding: 18px 26px; }
+  .overlay small { display: block; color: #bbb; font-size: 13px; margin-top: 4px; }
+</style>
+</head>
+<body>
+
+<canvas id="c"></canvas>
+<div id="help"><div class="wrap" id="helpContent"></div></div>
+<div id="toast" class="overlay"></div>
+<div id="note" class="overlay"></div>
+
+<script>
+"use strict";
+
+/* =========================================================================
+ * 1. TIL (i18n). O'zbek (lotin) — standart. Rus tilini qo'shish uchun
+ *    STR.ru ichiga xuddi shu kalitlarni tarjima bilan yozish kifoya;
+ *    tarjimasi yo'q kalitlar avtomatik o'zbekchadan olinadi.
+ *    Tilni tanlash: monitor-test.html?lang=ru
+ * ========================================================================= */
+const STR = {
+  uz: {
+    title: "MonitorCheck — monitor test sahifasi",
+    subtitle: "Ergonomik ko'rsatkichlar va standartlarga muvofiqlikni tekshirish uchun test rasmlari",
+    start: "Testni boshlash (to'liq ekran)",
+    h_prepare: "Tayyorgarlik",
+    prep: [
+      "Monitorni kamida <b>30 daqiqa</b> yoqib qo'ying (yorqinlik va rang barqarorlashishi uchun).",
+      "Monitor menyusida (OSD) <b>dinamik kontrast, ECO / energiya tejash, \"Low Blue Light\"</b> rejimlarini o'chiring; yorqinlik va kontrastni zavod sozlamasiga qaytaring.",
+      "Windows'da <b>Tungi yorug'lik (Night light)</b>, HDR va f.lux kabi dasturlarni o'chiring.",
+      "Windows ekran masshtabi (Scale) <b>100%</b> va ruxsat — monitorning <b>tabiiy (native)</b> ruxsati bo'lsin.",
+      "Xonani qorong'ilating (ayniqsa qora ekran va yorug'lik sizishi testlarida).",
+      "Brauzerda <kbd>F11</kbd> bosing yoki pastdagi tugmani bosing — sahifa to'liq ekranga o'tadi."
+    ],
+    h_keys: "Boshqaruv",
+    keys: [
+      ["→ &nbsp; Probel &nbsp; PageDown &nbsp; sichqoncha (o'ng qism)", "keyingi test"],
+      ["← &nbsp; Backspace &nbsp; PageUp &nbsp; sichqoncha (chap qism)", "oldingi test"],
+      ["1 … 9, 0", "test raqami bo'yicha o'tish (0 = 10-test)"],
+      ["Home", "shu yordam sahifasiga qaytish"],
+      ["M", "burchak markerlarini yoqish / o'chirish"],
+      ["H", "joriy test nomi va ko'rsatmani qayta ko'rsatish"],
+      ["F", "to'liq ekran rejimini yoqish / o'chirish"],
+      ["↑ ↓", "miltillash testida oq maydon darajasini o'zgartirish (255 / 192 / 128)"]
+    ],
+    h_tests: "Testlar ro'yxati",
+    th_no: "№", th_test: "Test", th_purpose: "Nima tekshiriladi",
+    h_screen: "Ekran ma'lumotlari (brauzer bo'yicha)",
+    scr_css: "Ekran (CSS piksel)",
+    scr_dpr: "devicePixelRatio (Windows masshtabi)",
+    scr_phys: "Taxminiy fizik ruxsat",
+    scr_win: "Oyna (qurilma pikselida)",
+    scr_depth: "colorDepth (brauzer bo'yicha)",
+    scr_fs: "To'liq ekran",
+    yes: "ha", no: "yo'q",
+    w_dpr: "Windows masshtabi 100% emas (devicePixelRatio ≠ 1). Rasmlar qurilma pikselida chiziladi, lekin aniqroq natija uchun masshtabni 100% qiling.",
+    w_dpr_frac: "devicePixelRatio kasr son: canvas piksellari ekran piksellariga aniq to'g'ri kelmasligi mumkin (gradient testiga ta'sir qiladi).",
+    w_fs: "Sahifa to'liq ekranda emas. F11 bosing yoki \"Testni boshlash\" tugmasidan foydalaning.",
+    w_ok: "Ogohlantirishlar yo'q.",
+    h_markers: "Burchak markerlari",
+    markers_txt: "Har bir test rasmining burchaklaridagi kichik qora-oq kvadratlar (ArUco markerlar) telefon ilovasiga qaysi test ko'rsatilayotganini aniqlash va ekran burchaklarini topish uchun kerak. Tahlilda bu sohalar hisobga olinmaydi. <kbd>M</kbd> tugmasi bilan ularni vaqtincha o'chirish mumkin.",
+    h_limits: "Muhim eslatma",
+    limits_txt: "Bu sahifa faqat test rasmlarini ko'rsatadi. O'lchash telefon ilovasi orqali bajariladi. Natijalar ergonomik ko'rsatkichlar va standartlarga muvofiqlik haqida ma'lumot beradi; tibbiy xulosa hisoblanmaydi.",
+    hint_nav: "← → almashtirish · H ma'lumot · M marker · Home yordam",
+    markers_on: "Markerlar: yoqilgan",
+    markers_off: "Markerlar: o'chirilgan",
+    level: "Maydon darajasi",
+
+    t_WHITE: "Oq ekran", p_WHITE: "O'lik (qora) piksellar, oq maydonda bir tekislik",
+    t_BLACK: "Qora ekran", p_BLACK: "Yopishgan (doim yonib turgan) piksellar",
+    t_RED: "Qizil ekran", p_RED: "Qizil subpiksel nuqsonlari",
+    t_GREEN: "Yashil ekran", p_GREEN: "Yashil subpiksel nuqsonlari",
+    t_BLUE: "Ko'k ekran", p_BLUE: "Ko'k subpiksel nuqsonlari",
+    t_GRAY50: "50% kulrang (128)", p_GRAY50: "Yorqinlik bir tekisligi (3×3 zona), dog'lar (mura)",
+    t_BLEED: "Qora fon, chetlar", p_BLEED: "Chetlardan yorug'lik sizishi (backlight bleed), IPS glow",
+    t_GRADIENT: "Gradientlar 0–255", p_GRADIENT: "Kulrang, R, G, B: banding (polosalar), rang chuqurligi",
+    t_GRADIENT_STEPS: "Pog'onali gradient", p_GRADIENT_STEPS: "Zinapoyalarni sanash: 0–63 va 192–255 (har birida 64 pog'ona bo'lishi kerak)",
+    t_FLICKER: "Miltillash (flicker)", p_FLICKER: "Yoritish PWM modulyatsiyasi (IEEE 1789-2015)",
+
+    n_BLEED: "Xonani qorong'ilating, monitor yorqinligini <b>100%</b> qiling.<br>Avval markerli rasm oling, so'ng <kbd>M</kbd> bilan markerlarni o'chirib, kamerani qimirlatmasdan yana suratga oling.",
+    n_FLICKER: "Monitor menyusidan (OSD) <b>yorqinlikni 20–30% ga tushiring</b>.<br>Telefonni ekranga 5–15 sm masofada, ekranga parallel tuting.<br><small>↑ ↓ — maydon darajasi (255 / 192 / 128)</small>",
+    n_GRADIENT: "Ekranga to'g'ridan-to'g'ri qarang. Silliq o'tish o'rniga aniq polosalar ko'rinsa — rang chuqurligi past bo'lishi mumkin.",
+    n_GRADIENT_STEPS: "Har bir polosada 64 ta teng pog'ona bo'lishi kerak. Pog'onalar 4 tadan qo'shilib ko'rinsa (16 ta) — 6-bitli panel belgisi.",
+    n_PIXELS: "Kamerani biroz <b>fokusdan chiqaring</b> (moiré effektini kamaytirish uchun)."
+  },
+  ru: {
+    // Rus tili tarjimasi keyingi bosqichda qo'shiladi. Masalan:
+    // title: "MonitorCheck — тестовая страница монитора",
+  }
+};
+const LANG = (new URLSearchParams(location.search).get("lang") || "uz").toLowerCase();
+function t(key) {
+  const s = (STR[LANG] && STR[LANG][key] !== undefined) ? STR[LANG][key] : STR.uz[key];
+  return s !== undefined ? s : key;
+}
+document.documentElement.lang = STR[LANG] ? LANG : "uz";
+
+/* =========================================================================
+ * 2. ArUco DICT_4X4_50 lug'ati.
+ *    Har bir son — 4×4 ichki bitlar, qatorlar bo'yicha, yuqori bit birinchi
+ *    (1 = oq katak, 0 = qora katak). OpenCV 5.0 cv2.aruco.generateImageMarker
+ *    natijasidan olingan. Manba: OpenCV, modules/objdetect (aruco) predefined
+ *    dictionaries.
+ * ========================================================================= */
+const ARUCO_4X4_50 = [
+  46386, 3994, 13101, 39238, 21662, 31181, 40494, 50418, 65242, 53078,
+  63889, 4519, 3767, 10767, 9393, 9790, 18021, 26112, 27742, 30383,
+  34443, 45099, 52437, 56706, 65095, 38001, 44260, 42324, 8483, 13423,
+  17429, 22450, 40655, 61643, 2222, 2345, 6261, 1279, 3574, 7258,
+  5912, 10792, 12940, 14514, 9448, 12011, 11583, 19300, 20526, 20499
+];
+
+/* =========================================================================
+ * 3. TESTLAR. id va code — telefon ilovasi bilan shartnoma
+ *    (docs/marker-spec.md). Tartibni o'zgartirmang; yangi test faqat
+ *    oxiriga qo'shiladi (DICT_4X4_50 da 12 tagacha test sig'adi).
+ * ========================================================================= */
+const FLICKER_LEVELS = [255, 192, 128];
+
+const TESTS = [
+  { id: 1,  code: "WHITE",    color: [255, 255, 255], note: "n_PIXELS" },
+  { id: 2,  code: "BLACK",    color: [0, 0, 0],       note: "n_PIXELS" },
+  { id: 3,  code: "RED",      color: [255, 0, 0],     note: "n_PIXELS" },
+  { id: 4,  code: "GREEN",    color: [0, 255, 0],     note: "n_PIXELS" },
+  { id: 5,  code: "BLUE",     color: [0, 0, 255],     note: "n_PIXELS" },
+  // 50% signal darajasi (8-bitda 128). Eslatma: sRGB gammasi tufayli bu
+  // yorqinlikning ~21,6% iga to'g'ri keladi (L ≈ ((128/255+0,055)/1,055)^2,4).
+  // Uniformity uchun o'rta kulrang VESA FPDM / ISO 9241-305 amaliyotiga mos.
+  { id: 6,  code: "GRAY50",   color: [128, 128, 128], note: "n_PIXELS" },
+  { id: 7,  code: "BLEED",    draw: drawBleed,        note: "n_BLEED", noteMs: 9000 },
+  { id: 8,  code: "GRADIENT", draw: drawGradient,     note: "n_GRADIENT" },
+  { id: 9,  code: "GRADIENT_STEPS", draw: drawGradientSteps, note: "n_GRADIENT_STEPS" },
+  { id: 10, code: "FLICKER",  draw: drawFlicker,      note: "n_FLICKER", noteMs: 9000 }
+];
+
+/* =========================================================================
+ * 4. HOLAT
+ * ========================================================================= */
+const state = {
+  idx: 0,              // 0 = yordam ekrani, 1..N = test
+  markers: true,
+  flickerLevel: 0      // FLICKER_LEVELS indeksi
+};
+
+const canvas = document.getElementById("c");
+const ctx = canvas.getContext("2d", { alpha: false });
+const toastEl = document.getElementById("toast");
+const noteEl = document.getElementById("note");
+let toastTimer = 0, noteTimer = 0;
+
+/* =========================================================================
+ * 5. CHIZISH FUNKSIYALARI (W, H — qurilma pikselida)
+ * ========================================================================= */
+function rgb(r, g, b) { return "rgb(" + r + "," + g + "," + b + ")"; }
+
+function fillSolid(W, H, c) {
+  ctx.fillStyle = rgb(c[0], c[1], c[2]);
+  ctx.fillRect(0, 0, W, H);
+}
+
+// Qora fon + aktiv soha chegarasida 1 px to'q kulrang (32) chiziq:
+// ekran chegarasi kamerada ko'rinadi, lekin sizgan yorug'likka deyarli ta'sir qilmaydi.
+function drawBleed(W, H) {
+  fillSolid(W, H, [0, 0, 0]);
+  ctx.fillStyle = rgb(32, 32, 32);
+  ctx.fillRect(0, 0, W, 1);
+  ctx.fillRect(0, H - 1, W, 1);
+  ctx.fillRect(0, 0, 1, H);
+  ctx.fillRect(W - 1, 0, 1, H);
+}
+
+// Bitta gorizontal polosa: [y0, y1) oralig'ida from..to darajalar,
+// har bir daraja eni bo'yicha teng (butun pikselga yaxlitlangan) pog'ona.
+// mask: [r,g,b] — qaysi kanallar yoqilgan (kulrang uchun [1,1,1]).
+function drawRamp(W, y0, y1, from, to, mask) {
+  const n = to - from + 1;
+  for (let i = 0; i < n; i++) {
+    const x0 = Math.floor(i * W / n);
+    const x1 = Math.floor((i + 1) * W / n);
+    const v = from + i;
+    ctx.fillStyle = rgb(v * mask[0], v * mask[1], v * mask[2]);
+    ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
+  }
+}
+
+// 4 polosa: kulrang, qizil, yashil, ko'k; har biri 0→255 (256 pog'ona).
+// 8-bitli panelda o'tish silliq, 6-bitli (FRC'siz) panelda 64 ta aniq polosa ko'rinadi.
+function drawGradient(W, H) {
+  const masks = [[1, 1, 1], [1, 0, 0], [0, 1, 0], [0, 0, 1]];
+  for (let b = 0; b < 4; b++) {
+    drawRamp(W, Math.floor(b * H / 4), Math.floor((b + 1) * H / 4), 0, 255, masks[b]);
+  }
+}
+
+// 2 polosa: 0→63 (qorong'i soha) va 192→255 (yorug' soha), har biri 64 pog'ona,
+// har bir pog'ona keng (1920 px da 30 px). 8-bit: 64 pog'ona ko'rinadi;
+// 6-bit (FRC'siz): 4 tadan birlashib 16 pog'ona; 6-bit+FRC: pog'onalar
+// orasida vaqt bo'yicha dithering (titrash) bo'lishi mumkin.
+function drawGradientSteps(W, H) {
+  const mid = Math.floor(H / 2);
+  drawRamp(W, 0, mid, 0, 63, [1, 1, 1]);
+  drawRamp(W, mid, H, 192, 255, [1, 1, 1]);
+}
+
+// Bir tekis oq maydon. PWM — yoritish (backlight) modulyatsiyasi bo'lib,
+// LCD'da piksel qiymatiga bog'liq emas, monitor yorqinligi sozlamasiga bog'liq.
+// OLED panellarda esa piksel darajasi ham ta'sir qiladi — shuning uchun daraja
+// ↑/↓ bilan o'zgartiriladi.
+function drawFlicker(W, H) {
+  const v = FLICKER_LEVELS[state.flickerLevel];
+  fillSolid(W, H, [v, v, v]);
+}
+
+/* --- ArUco markerlar ---------------------------------------------------- */
+
+// Katak o'lchami (qurilma pikselida). Formula docs/marker-spec.md da.
+function cellSize(W, H) {
+  return Math.max(4, Math.round(Math.min(W, H) / 135));
+}
+
+// (x0, y0) — sokin zonaning yuqori-chap burchagi; jami 8×8 katak.
+function drawMarker(x0, y0, c, markerId) {
+  const code = ARUCO_4X4_50[markerId];
+  ctx.fillStyle = "#fff";                         // sokin zona
+  ctx.fillRect(x0, y0, 8 * c, 8 * c);
+  ctx.fillStyle = "#000";                         // qora chegara + fon
+  ctx.fillRect(x0 + c, y0 + c, 6 * c, 6 * c);
+  ctx.fillStyle = "#fff";                         // ma'lumot bitlari
+  for (let r = 0; r < 4; r++) {
+    for (let k = 0; k < 4; k++) {
+      const bit = (code >> (15 - (r * 4 + k))) & 1;
+      if (bit) ctx.fillRect(x0 + (2 + k) * c, y0 + (2 + r) * c, c, c);
+    }
+  }
+}
+
+function markerIds(testId) {
+  const base = (testId - 1) * 4;
+  return [base, base + 1, base + 2, base + 3];  // TL, TR, BR, BL
+}
+
+function drawMarkers(W, H, testId) {
+  const c = cellSize(W, H), s = 8 * c, ids = markerIds(testId);
+  drawMarker(0,     0,     c, ids[0]);   // yuqori-chap
+  drawMarker(W - s, 0,     c, ids[1]);   // yuqori-o'ng
+  drawMarker(W - s, H - s, c, ids[2]);   // pastki-o'ng
+  drawMarker(0,     H - s, c, ids[3]);   // pastki-chap
+}
+
+/* =========================================================================
+ * 6. RENDER
+ * ========================================================================= */
+function canvasSize() {
+  const dpr = window.devicePixelRatio || 1;
+  return {
+    W: Math.round(window.innerWidth * dpr),
+    H: Math.round(window.innerHeight * dpr),
+    dpr: dpr
+  };
+}
+
+function render() {
+  if (state.idx === 0) {
+    document.body.classList.remove("testing");
+    renderHelp();
+    return;
+  }
+  document.body.classList.add("testing");
+  const test = TESTS[state.idx - 1];
+  const { W, H, dpr } = canvasSize();
+  if (canvas.width !== W || canvas.height !== H) {
+    canvas.width = W;
+    canvas.height = H;
+  }
+  canvas.style.width = (W / dpr) + "px";
+  canvas.style.height = (H / dpr) + "px";
+  ctx.imageSmoothingEnabled = false;
+
+  if (test.draw) test.draw(W, H);
+  else fillSolid(W, H, test.color);
+
+  if (state.markers) drawMarkers(W, H, test.id);
+}
+
+function testName(test) { return t("t_" + test.code); }
+
+function showToast(html, ms) {
+  toastEl.innerHTML = html;
+  toastEl.style.display = "block";
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { toastEl.style.display = "none"; }, ms || 2500);
+}
+
+function showNote(key, ms) {
+  if (!key) { noteEl.style.display = "none"; return; }
+  noteEl.innerHTML = t(key);
+  noteEl.style.display = "block";
+  clearTimeout(noteTimer);
+  noteTimer = setTimeout(() => { noteEl.style.display = "none"; }, ms || 4500);
+}
+
+function hideOverlays() {
+  clearTimeout(toastTimer); clearTimeout(noteTimer);
+  toastEl.style.display = "none"; noteEl.style.display = "none";
+}
+
+function announce() {
+  if (state.idx === 0) { hideOverlays(); return; }
+  const test = TESTS[state.idx - 1];
+  let extra = "";
+  if (test.code === "FLICKER") extra = " · " + t("level") + ": " + FLICKER_LEVELS[state.flickerLevel];
+  showToast("<b>" + test.id + "/" + TESTS.length + " · " + testName(test) + "</b>" + extra +
+            "<small>" + t("hint_nav") + "</small>");
+  showNote(test.note, test.noteMs);
+}
+
+function go(i) {
+  const n = TESTS.length;
+  state.idx = ((i % (n + 1)) + (n + 1)) % (n + 1);   // 0..n, aylanma
+  updateHash();
+  render();
+  announce();
+}
+
+function updateHash() {
+  const h = "#t=" + state.idx + (state.markers ? "" : "&m=0");
+  try { history.replaceState(null, "", h); } catch (e) { /* file:// cheklovi */ }
+}
+
+function readHash() {
+  const p = new URLSearchParams(location.hash.replace(/^#/, ""));
+  const ti = parseInt(p.get("t"), 10);
+  if (!isNaN(ti) && ti >= 0 && ti <= TESTS.length) state.idx = ti;
+  if (p.get("m") === "0") state.markers = false;
+}
+
+/* =========================================================================
+ * 7. YORDAM EKRANI
+ * ========================================================================= */
+function isFullscreen() {
+  return !!document.fullscreenElement ||
+         (Math.abs(window.innerWidth - screen.width) <= 1 &&
+          Math.abs(window.innerHeight - screen.height) <= 1);
+}
+
+function renderHelp() {
+  const dpr = window.devicePixelRatio || 1;
+  const { W, H } = canvasSize();
+  const warns = [];
+  if (Math.abs(dpr - 1) > 1e-6) warns.push(t("w_dpr"));
+  if (Math.abs(dpr - Math.round(dpr)) > 1e-6) warns.push(t("w_dpr_frac"));
+  if (!isFullscreen()) warns.push(t("w_fs"));
+
+  const sw = (tt) => tt.color
+    ? '<span class="swatch" style="background:' + rgb(tt.color[0], tt.color[1], tt.color[2]) + '"></span>'
+    : '<span class="swatch" style="background:linear-gradient(90deg,#000,#fff)"></span>';
+
+  document.getElementById("helpContent").innerHTML =
+    "<h1>" + t("title") + "</h1>" +
+    '<p class="sub">' + t("subtitle") + "</p>" +
+
+    "<h2>" + t("h_prepare") + "</h2><ul>" +
+      t("prep").map(s => "<li>" + s + "</li>").join("") + "</ul>" +
+    '<button id="start">' + t("start") + "</button>" +
+
+    "<h2>" + t("h_tests") + "</h2><table><tr><th>" + t("th_no") + "</th><th>" + t("th_test") +
+      "</th><th>" + t("th_purpose") + "</th></tr>" +
+      TESTS.map(tt => "<tr><td><kbd>" + (tt.id % 10) + "</kbd></td><td>" + sw(tt) + testName(tt) +
+        "</td><td>" + t("p_" + tt.code) + "</td></tr>").join("") +
+    "</table>" +
+
+    "<h2>" + t("h_keys") + "</h2><table>" +
+      t("keys").map(k => "<tr><td>" + k[0].split(/ &nbsp; /).map(x => "<kbd>" + x + "</kbd>").join(" ") +
+        "</td><td>" + k[1] + "</td></tr>").join("") +
+    "</table>" +
+
+    "<h2>" + t("h_screen") + "</h2><div class=\"info\">" +
+      t("scr_css") + ": " + screen.width + " × " + screen.height + "<br>" +
+      t("scr_dpr") + ": " + dpr + "<br>" +
+      t("scr_phys") + ": " + Math.round(screen.width * dpr) + " × " + Math.round(screen.height * dpr) + "<br>" +
+      t("scr_win") + ": " + W + " × " + H + "<br>" +
+      t("scr_depth") + ": " + screen.colorDepth + " bit<br>" +
+      t("scr_fs") + ": " + (isFullscreen() ? t("yes") : t("no")) +
+    "</div>" +
+    (warns.length
+      ? "<ul>" + warns.map(w => '<li class="warn">' + w + "</li>").join("") + "</ul>"
+      : '<p class="ok">' + t("w_ok") + "</p>") +
+
+    "<h2>" + t("h_markers") + "</h2><p>" + t("markers_txt") + "</p>" +
+    "<h2>" + t("h_limits") + "</h2><p>" + t("limits_txt") + "</p>";
+
+  document.getElementById("start").onclick = (e) => {
+    e.stopPropagation();
+    enterFullscreen();
+    go(1);
+  };
+}
+
+/* =========================================================================
+ * 8. BOSHQARUV
+ * ========================================================================= */
+function enterFullscreen() {
+  const el = document.documentElement;
+  if (!document.fullscreenElement && el.requestFullscreen) {
+    el.requestFullscreen().catch(() => {});
+  }
+  requestWakeLock();
+}
+
+function toggleFullscreen() {
+  if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  else enterFullscreen();
+}
+
+// Ekran o'chib qolmasligi uchun (faqat qo'llab-quvvatlovchi brauzerlarda).
+let wakeLock = null;
+function requestWakeLock() {
+  if (wakeLock || !("wakeLock" in navigator)) return;
+  navigator.wakeLock.request("screen")
+    .then(l => { wakeLock = l; l.addEventListener("release", () => { wakeLock = null; }); })
+    .catch(() => {});
+}
+
+document.addEventListener("keydown", (e) => {
+  if (e.ctrlKey || e.altKey || e.metaKey) return;
+  const k = e.key;
+  let handled = true;
+  switch (k) {
+    case "ArrowRight": case " ": case "PageDown": case "Enter":
+      go(state.idx + 1); break;
+    case "ArrowLeft": case "Backspace": case "PageUp":
+      go(state.idx - 1); break;
+    case "Home":
+      go(0); break;
+    case "m": case "M": case "ь": case "Ь":
+      state.markers = !state.markers;
+      updateHash(); render();
+      if (state.idx > 0) showToast(state.markers ? t("markers_on") : t("markers_off"), 1500);
+      break;
+    case "h": case "H": case "?": case "р": case "Р":
+      if (state.idx > 0) announce(); break;
+    case "f": case "F": case "а": case "А":
+      toggleFullscreen(); break;
+    case "ArrowUp": case "ArrowDown":
+      if (state.idx > 0 && TESTS[state.idx - 1].code === "FLICKER") {
+        const n = FLICKER_LEVELS.length;
+        state.flickerLevel = (state.flickerLevel + (k === "ArrowUp" ? n - 1 : 1)) % n;
+        render();
+        showToast(t("level") + ": " + FLICKER_LEVELS[state.flickerLevel], 1500);
+      } else handled = false;
+      break;
+    default:
+      if (/^[0-9]$/.test(k)) {
+        const d = parseInt(k, 10);
+        go(d === 0 ? 10 : d);
+      } else handled = false;
+  }
+  if (handled) e.preventDefault();
+});
+
+document.addEventListener("click", (e) => {
+  if (state.idx === 0) return;                 // yordam ekranida faqat tugma
+  requestWakeLock();
+  if (e.clientX < window.innerWidth / 3) go(state.idx - 1);
+  else go(state.idx + 1);
+});
+
+window.addEventListener("resize", () => render());
+document.addEventListener("fullscreenchange", () => render());
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && wakeLock === null) requestWakeLock();
+});
+
+/* =========================================================================
+ * 9. AVTOMATLASHTIRISH API (sinov skriptlari uchun, docs/marker-spec.md)
+ * ========================================================================= */
+window.MonitorTest = {
+  version: 1,
+  tests: TESTS.map(tt => ({ id: tt.id, code: tt.code, color: tt.color || null })),
+  go: (i) => go(i),
+  markerIds: markerIds,
+  cellSize: () => { const s = canvasSize(); return cellSize(s.W, s.H); },
+  setMarkers: (on) => { state.markers = !!on; updateHash(); render(); },
+  hideOverlays: hideOverlays
+};
+
+readHash();
+render();
+announce();
+</script>
+</body>
+</html>
