@@ -8,11 +8,12 @@ qo'ygan-qo'ymaganini aniqlashga yordam beradi.
 | Qism | Holat | Joyi |
 |------|-------|------|
 | 1. Test sahifasi (HTML) | ✅ tayyor | [`test-page/`](test-page/) |
-| 2. EDID o'quvchi (Windows, Python) | ⏳ | `edid-reader/` |
+| 2. EDID o'quvchi (Windows, Python) | ✅ tayyor | [`edid-reader/`](edid-reader/) |
 | 3–6. Android ilova (flicker, piksellar, PDF, spektr) | ⏳ | `android-app/` |
 
 Arxitektura: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) ·
-Marker protokoli: [`docs/marker-spec.md`](docs/marker-spec.md)
+Marker protokoli: [`docs/marker-spec.md`](docs/marker-spec.md) ·
+EDID QR formati: [`docs/edid-schema.md`](docs/edid-schema.md)
 
 ## 1. Test sahifasi
 

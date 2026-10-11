@@ -57,14 +57,16 @@ telegrambotAI/
 │
 ├── edid-reader/                 ── 2-bosqich (Python → PyInstaller .exe)
 │   ├── edid_reader/
-│   │   ├── __main__.py          ← CLI / oddiy GUI
-│   │   ├── registry.py          ← winreg orqali EDID o'qish
-│   │   ├── decoder.py           ← EDID 1.3/1.4 + CTA-861 dekoder (OS'ga bog'liq emas)
-│   │   ├── pnp_ids.py           ← PNP ishlab chiqaruvchi kodlari jadvali
+│   │   ├── cli.py               ← interaktiv / buyruq qatori interfeysi
+│   │   ├── sources.py           ← Windows reyestri (winreg), Linux sysfs, fayl
+│   │   ├── decoder.py           ← EDID 1.3/1.4 + CTA-861 + DisplayID (OS'ga bog'liq emas)
+│   │   ├── timings.py           ← standart rejimlar (DMT, CTA VIC) jadvallari
+│   │   ├── vendors.py, pnp_ids.py ← PNP ishlab chiqaruvchi kodlari (UEFI registri)
 │   │   ├── compare.py           ← shartnoma modeli bilan solishtirish
-│   │   └── export.py            ← JSON + QR
-│   ├── tests/                   ← pytest (namuna EDID binarlari bilan)
-│   └── build_exe.bat
+│   │   ├── export.py            ← JSON + QR + HTML hisobot
+│   │   └── messages.py          ← matnlar (uz; ru keyinchalik)
+│   ├── tests/                   ← pytest: sintetik + 27 ta real EDID (edid-decode bilan)
+│   └── build_exe.bat            (+ .github/workflows/edid-reader.yml — .exe avtomatik yig'iladi)
 │
 └── android-app/                 ── 3–6-bosqichlar
     ├── settings.gradle.kts
