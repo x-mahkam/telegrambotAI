@@ -1,0 +1,58 @@
+name: EDID reader
+
+on:
+  push:
+    paths: ["edid-reader/**", ".github/workflows/edid-reader.yml"]
+  pull_request:
+    paths: ["edid-reader/**", ".github/workflows/edid-reader.yml"]
+  workflow_dispatch:
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: edid-reader
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements-dev.txt
+      - run: python -m pytest -v
+
+  build-exe:
+    needs: test
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: edid-reader
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt pyinstaller
+      - name: Build MonitorCheck-EDID.exe
+        run: >
+          pyinstaller --onefile --console --name MonitorCheck-EDID
+          --collect-submodules qrcode
+          --exclude-module tkinter --exclude-module numpy --exclude-module PIL
+          run_edid_reader.py
+      - name: Smoke test (sample EDID file)
+        run: |
+          ./dist/MonitorCheck-EDID.exe --version
+          ./dist/MonitorCheck-EDID.exe "tests/data/linuxhw/brand_DEL__DEL40BB_3032FDD15FCC.txt" \
+            --brand Dell --model S2715H --no-open --no-interactive --out smoke
+          test -f smoke/hisobot.html
+      - name: Smoke test (Windows registry; runner may have no monitor)
+        run: ./dist/MonitorCheck-EDID.exe --all --no-open --no-interactive --out smoke-reg || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MonitorCheck-EDID-windows
+          path: edid-reader/dist/MonitorCheck-EDID.exe

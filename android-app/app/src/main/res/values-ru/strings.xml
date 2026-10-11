@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Русский язык: перевод будет добавлен на следующих этапах (ключи как в values/strings.xml). -->
+<resources>
+    <string name="app_name">MonitorCheck</string>
+    <string name="home_title">Проверка качества монитора</string>
+</resources>
