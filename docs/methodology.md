@@ -125,6 +125,12 @@ kalibrovka), kamera javobining chiziqli emasligi va tashqi yorug'lik.
 * O'lchanadigan eng yuqori chastota ≈ `1/(2·t_row)` (odatda 25–50 kHz);
   amalda `f ≲ 1/(2·T_e)` gacha ishonchli.
 * Kadrda < 1.5 sikl bo'lsa (f ≲ 1.5/skew, odatda < 60–100 Hz) chastota aniqlanmaydi.
+* **Qamrov.** Ekspozitsiya T_e bo'lsa, ishonchli tekshiriladigan chastotalar
+  f ≤ 0.6034/T_e (|sinc| ≥ 0.5). "Miltillash yo'q" xulosasi faqat qamrov ≥ 3000 Hz
+  (NOEL chegarasi) bo'lganda beriladi; aks holda natija "noaniq". Masalan, avtomatik
+  rejimda 1/100 s ekspozitsiyada qamrov atigi ~60 Hz.
+* **Qo'lda ekspozitsiya tekshiruvi.** Ilova so'ralgan T_e ni kadr natijasidagi haqiqiy
+  `SENSOR_EXPOSURE_TIME` bilan solishtiradi (±30%); bajarilmasa — avtomatik rejimga o'tadi.
 * Natija laboratoriya fotometri / ossillograf bilan o'lchovning o'rnini bosmaydi.
 * Chegaraviy holatlarda ekspert tekshiruvi tavsiya etiladi.
 
@@ -136,7 +142,66 @@ kalibrovka), kamera javobining chiziqli emasligi va tashqi yorug'lik.
 EDID — monitor proshivkasidagi o'z-o'zi haqidagi ma'lumot; u panel turini, haqiqiy
 rang chuqurligini (6-bit+FRC) yoki haqiqiy rang qamrovini kafolatlamaydi.
 
-## 3. O'lik piksellar, bir tekislik, banding — 4-bosqichda
+## 3. Piksellar, bir tekislik, chet sizishi, rang chuqurligi
+
+### 3.1. Geometriya (perspektivani tuzatish)
+
+* Test sahifasi har bir rasm burchagiga ArUco DICT_4X4_50 markerini chizadi
+  ([`marker-spec.md`](marker-spec.md)). Ilova ularni o'zining detektori bilan topadi
+  (OpenCV'siz): moslashuvchan bo'sag'a → bog'liq sohalar → qavariq qobiq → to'rtburchak →
+  6×6 katakni gomografiya bilan o'qish → lug'at bilan solishtirish (4 burilish).
+* Burchaklar subpiksel aniqlikda: har bir tomon bo'ylab 11 ta kesimda qora↔oq o'tishning
+  50% nuqtasi, chiziq (umumiy eng kichik kvadratlar), kesishma. Muhim: bu **chiziqli**
+  yorqinlikda bajariladi — kamera xiraligi chiziqli yorug'likda sodir bo'ladi, gamma-kodlangan
+  qiymatlarda 50% nuqta ~0.5–1 px siljiydi.
+* Ekran: 4 marker × 4 burchak = 16 nuqta. Noma'lumlar — gomografiya H (8) va ekran
+  o'lchami kataklarda (W_c, H_c); qayta proyeksiya xatosi W_c, H_c bo'yicha minimallashtiriladi
+  (normallashtirilgan DLT, Hartley & Zisserman, 2004). Natija — ekranning haqiqiy tomonlar
+  nisbati va har bir tasvir nuqtasining ekrandagi joyi.
+* Tekshirilgan aniqlik: sintetik suratlarda marker burchagi < 0.6 px, ekran burchagi < 3 px;
+  Chromium'da chizilgan haqiqiy test sahifasi (perspektiva + xiralik + shovqin + JPEG)
+  suratlarida barcha markerlar va ekran burchaklari to'g'ri topilgan.
+
+### 3.2. Yorqinlik bir tekisligi (1- va 6-testlar)
+
+9 nuqtali usul (VESA FPDM 2.0, 306-1; ISO 9241-305): zonalar markazlari (1/6, 1/2, 5/6)
+atrofida ekranning ±5% li yamoqlarida chiziqli yorqinlikning kesilgan o'rtachasi.
+
+```
+U = L_min / L_max × 100 %,     zona / markaz × 100 %
+```
+
+Ichki baho: U ≥ 80% — yaxshi; 70–80% — qoniqarli; < 70% — past.
+Cheklovlar: telefon linzasi vinyetkasi (ISP qisman tuzatadi), LCD yorqinligining qarash
+burchagiga bog'liqligi (ilova burchaklarga qarash burchagini pinhole model bo'yicha hisoblaydi,
+> 25° bo'lsa ogohlantiradi).
+
+### 3.3. Piksel nuqsonlari (1–5-testlar)
+
+Fon — har bir kanal uchun blok medianalari (blok ≈ ekran kengligining 1/48 i) + bilinear
+interpolyatsiya. Og'ish: yorqin fonda `max_c |I_c − B_c| / B_Y`, qora fonda `Y − B_Y`.
+Shovqin σ = 1.4826·MAD; nomzod: og'ish > max(6σ, 22%) (qora fonda > max(10σ, 0.01)).
+Nomzodlar 8-qo'shnilik bo'yicha guruhlanadi; o'lcham yarim maksimum bo'yicha
+(yorug' nuqtaning "yoyilishi" hisobga olinmasligi uchun). Tasnif: ≤ 9 ekran pikseli —
+piksel nuqsoni (o'lik / yonib turgan / subpiksel), kattasi — dog' (chang, mura).
+
+Sinf — ISO 9241-307:2008, 1 million pikselga: 0 sinf: 0/0/0; I: 1/1/2; II: 2/2/5;
+III: 5/15/50 (1-tur yonib turgan, 2-tur o'lik, 3-tur subpiksel). Bir joydagi nuqson turli
+testlarda bir marta hisoblanadi. Ekran pikseli kamerada < 1.2 px bo'lsa ogohlantiriladi.
+
+### 3.4. Chetlardan yorug'lik sizishi (7-test)
+
+Ikkita surat: qisqa ekspozitsiya (−2 EV) — markerlar va geometriya; uzun (+1 EV) — tahlil.
+12×8 katakli xarita, markaz = 1; baho — chet kataklaridagi eng katta nisbat:
+< 1.5 sezilarli emas; 1.5–3 o'rtacha; > 3 kuchli (ichki mezon).
+
+### 3.5. Rang chuqurligi (9-test)
+
+Ikki polosa (0→63, 192→255), har biri 64 katak. Katak o'rtachasi m_k, standart xato se_k;
+o'sish ahamiyatli: `d_k > 4·√(se_k² + se_{k+1}²)` va `d_k > 0.25·⟨d⟩`. 8-bit panelda
+64 pog'ona, 6-bitda (FRC'siz) 4 tadan birlashib 16 pog'ona; bunda o'sishlar 4 ga karrali
+joylarda to'planadi. 6-bit+FRC panel vaqt bo'yicha aralashtirish tufayli 8-bit kabi
+ko'rinadi — buni kamera bilan ajratib bo'lmaydi.
 
 ## 4. Spektr — 6-bosqichda
 
