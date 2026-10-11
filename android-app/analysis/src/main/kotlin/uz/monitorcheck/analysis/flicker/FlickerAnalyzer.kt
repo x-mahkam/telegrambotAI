@@ -103,7 +103,22 @@ data class FlickerMeasurement(
     val phaseCoherence: Double?,
     val waveform: DoubleArray?,
     val warnings: Set<FlickerWarning>,
+    /**
+     * Ishonchli qamrov chegarasi, Hz: f ≤ coverageHz da |sinc(f·T_e)| ≥ 0.5, ya'ni miltillash
+     * kamida yarmi saqlangan holda ko'rinadi (f_max = 0.6034/T_e), va Naykvist chegarasidan past.
+     * Miltillash topilmasa, xulosa faqat shu chastotagacha amal qiladi.
+     */
+    val coverageHz: Double? = null,
 )
+
+/** |sinc(x)| = 0.5 bo'ladigan x (sin(πx)/(πx) = 0.5 tenglamasining yechimi). */
+const val SINC_HALF_X = 0.6034
+
+fun coverageHz(exposureSec: Double?, timing: RowTiming): Double? {
+    if (exposureSec == null || exposureSec <= 0) return null
+    val byExposure = SINC_HALF_X / exposureSec
+    return timing.nyquistHz?.let { minOf(it, byExposure) } ?: byExposure
+}
 
 /**
  * Rolling shutter usulida miltillashni (PWM) o'lchash.
@@ -303,7 +318,7 @@ class FlickerAnalyzer(private val config: Config = Config()) {
         val limit = if (frames.isEmpty()) Double.NaN else Stats.median(frames.map { it.detectionLimitPct }.toDoubleArray())
         if (frames.isEmpty() || det.size < max(2, (frames.size + 1) / 2)) {
             return FlickerMeasurement(false, frames.size, det.size, 0, null, null, null, null, null, null,
-                limit, timing, exposureSec, null, null, warnings)
+                limit, timing, exposureSec, null, null, warnings, coverageHz(exposureSec, timing))
         }
 
         val medNu = Stats.median(det.map { it.cyclesPerRow }.toDoubleArray())
@@ -335,7 +350,7 @@ class FlickerAnalyzer(private val config: Config = Config()) {
             Stats.estimate(rectFrames.mapNotNull { it.dutyCycle }.toDoubleArray()) else null
 
         return FlickerMeasurement(true, frames.size, det.size, use.size, nuEst, fEst, mEst, rawEst, dutyEst, model,
-            limit, timing, exposureSec, coherence, wf, warnings)
+            limit, timing, exposureSec, coherence, wf, warnings, coverageHz(exposureSec, timing))
     }
 
     // ---------------------------------------------------------------------------------

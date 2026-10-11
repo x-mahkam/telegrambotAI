@@ -34,6 +34,12 @@ enum class Ieee1789Level {
 
     /** Miltillash bor, lekin chastota noma'lum (t_row yo'q) — standart bo'yicha baholab bo'lmaydi. */
     FREQUENCY_UNKNOWN,
+
+    /**
+     * Miltillash topilmadi, lekin o'lchov 3000 Hz gacha qamrab olmadi (ekspozitsiya uzun) —
+     * "miltillash yo'q" deb xulosa qilib bo'lmaydi.
+     */
+    INCONCLUSIVE,
 }
 
 data class Ieee1789Assessment(
@@ -46,6 +52,8 @@ data class Ieee1789Assessment(
     val lowRiskLimitPct: Double?,
     /** Ishonch oralig'i chegaradan o'tadi — natija chegaraga yaqin. */
     val borderline: Boolean,
+    /** O'lchov qamrovi, Hz (miltillash topilmaganda xulosa shu chastotagacha amal qiladi). */
+    val coverageHz: Double? = null,
 )
 
 object Ieee1789 {
@@ -68,11 +76,16 @@ object Ieee1789 {
         else -> Ieee1789Level.HIGH_RISK
     }
 
+    /** "Miltillash yo'q" xulosasi uchun kerakli qamrov: NOEL cheklovi 3000 Hz gacha amal qiladi. */
+    const val REQUIRED_COVERAGE_HZ = 3000.0
+
     /**
      * @param modHighPct modulyatsiya ishonch oralig'ining yuqori chegarasi (bo'lsa) —
      *   agar u boshqa zonaga tushsa, natija "chegaraga yaqin" deb belgilanadi.
      * @param fLowHz, fHighHz chastota ishonch oralig'i chegaralari (bo'lsa).
+     * @param coverageHz o'lchov qamrovi; miltillash topilmasa va qamrov < 3000 Hz bo'lsa — INCONCLUSIVE.
      */
+
     fun assess(
         detected: Boolean,
         frequencyHz: Double?,
@@ -80,9 +93,12 @@ object Ieee1789 {
         modHighPct: Double? = null,
         fLowHz: Double? = null,
         fHighHz: Double? = null,
+        coverageHz: Double? = null,
     ): Ieee1789Assessment {
         if (!detected || modulationPct == null) {
-            return Ieee1789Assessment(Ieee1789Level.NO_FLICKER_DETECTED, null, modulationPct, null, null, false)
+            val level = if (coverageHz != null && coverageHz >= REQUIRED_COVERAGE_HZ) Ieee1789Level.NO_FLICKER_DETECTED
+            else Ieee1789Level.INCONCLUSIVE
+            return Ieee1789Assessment(level, null, modulationPct, null, null, false, coverageHz)
         }
         if (frequencyHz == null) {
             return Ieee1789Assessment(Ieee1789Level.FREQUENCY_UNKNOWN, null, modulationPct, null, null, false)
@@ -100,6 +116,7 @@ object Ieee1789 {
             noelLimitPct = noelLimitPct(frequencyHz),
             lowRiskLimitPct = lowRiskLimitPct(frequencyHz),
             borderline = alt.any { it != level },
+            coverageHz = coverageHz,
         )
     }
 }

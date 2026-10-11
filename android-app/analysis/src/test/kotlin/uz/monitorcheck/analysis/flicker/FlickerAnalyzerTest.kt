@@ -147,6 +147,16 @@ class FlickerAnalyzerTest {
     }
 
     @Test
+    fun `coverage follows exposure time`() {
+        val frames = (0 until 10).map { frame(sim.constant(), 0.01, seed = it.toLong()) }
+        val m = analyzer.combine(frames, timing, 0.01, ResponseModel.LINEAR)
+        assertFalse(m.detected)
+        assertEquals(60.34, m.coverageHz!!, 0.01)                   // 1/100 s → faqat ~60 Hz gacha
+        assertEquals(4827.2, coverageHz(1.0 / 8000, timing)!!, 0.1)  // 1/8000 s → ~4.8 kHz
+        assertEquals(abs(Signal.sinc(SINC_HALF_X)), 0.5, 1e-3)
+    }
+
+    @Test
     fun `warnings for missing timing and nonlinear response`() {
         val frames = (0 until 4).map { frame(sim.sine(500.0, 30.0), 1.0 / 8000, t0 = it * 1.3e-3) }
         val m = analyzer.combine(frames, RowTiming.UNKNOWN, null, ResponseModel.SRGB_APPROX)

@@ -92,7 +92,9 @@ class FlickerCamera(context: Context, val config: CameraConfig) {
             CameraConfig.TARGET_EXPOSURE_NS.coerceIn(it.lower, it.upper)
         } ?: CameraConfig.TARGET_EXPOSURE_NS
         val iso = config.isoRange?.let { (it.lower * 4).coerceIn(it.lower, it.upper) } ?: 400
-        return CaptureSettings(config.manualSensor, exp, iso)
+        // Qo'lda rejim rasman (MANUAL_SENSOR) yoki AE_MODE_OFF orqali sinab ko'riladi;
+        // ishlamasa ViewModel avtomatik rejimga o'tkazadi (haqiqiy ekspozitsiya natijadan tekshiriladi).
+        return CaptureSettings(config.aeOffSupported, exp, iso)
     }
 
     @SuppressLint("MissingPermission")
@@ -139,12 +141,17 @@ class FlickerCamera(context: Context, val config: CameraConfig) {
         settings = newSettings
         val id = settingsCounter.incrementAndGet()
 
-        val template = if (newSettings.manual) CameraDevice.TEMPLATE_MANUAL else CameraDevice.TEMPLATE_PREVIEW
+        val template = if (newSettings.manual && config.manualSensor) CameraDevice.TEMPLATE_MANUAL else CameraDevice.TEMPLATE_PREVIEW
         val b = dev.createCaptureRequest(template)
         b.addTarget(prev)
         b.addTarget(rdr.surface)
         if (newSettings.manual) {
-            b.set(CaptureRequest.CONTROL_MODE, CaptureRequest.CONTROL_MODE_OFF)
+            if (config.manualSensor) {
+                b.set(CaptureRequest.CONTROL_MODE, CaptureRequest.CONTROL_MODE_OFF)
+            } else {
+                // MANUAL_SENSOR e'lon qilinmagan, lekin AE_MODE_OFF bor: ko'p qurilmalar baribir bajaradi
+                b.set(CaptureRequest.CONTROL_MODE, CaptureRequest.CONTROL_MODE_AUTO)
+            }
             b.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_OFF)
             b.set(CaptureRequest.SENSOR_EXPOSURE_TIME, newSettings.exposureNs)
             b.set(CaptureRequest.SENSOR_SENSITIVITY, newSettings.iso)
@@ -153,8 +160,11 @@ class FlickerCamera(context: Context, val config: CameraConfig) {
             b.set(CaptureRequest.CONTROL_MODE, CaptureRequest.CONTROL_MODE_AUTO)
             b.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON)
             // Antibanding avtomatik ekspozitsiyani 10 ms ga karrali qiladi va 100 Hz polosalarni
-            // yo'qotadi — o'chiriladi. Haqiqiy ekspozitsiya har kadr natijasidan o'qiladi.
+            // yo'qotadi — o'chiriladi. Ekspozitsiyani qisqartirish uchun: eng past kompensatsiya
+            // va eng yuqori kadrlar chastotasi. Haqiqiy ekspozitsiya har kadr natijasidan o'qiladi.
             b.set(CaptureRequest.CONTROL_AE_ANTIBANDING_MODE, CaptureRequest.CONTROL_AE_ANTIBANDING_MODE_OFF)
+            config.aeCompensationRange?.let { b.set(CaptureRequest.CONTROL_AE_EXPOSURE_COMPENSATION, it.lower) }
+            config.fastFpsRange?.let { b.set(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, it) }
         }
         if (config.manualFocus) {
             // Fokus cheksizlikda: 5–15 sm dagi ekran xiralashadi, piksel to'ri (moiré) yo'qoladi.

@@ -10,6 +10,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import uz.monitorcheck.ui.flicker.FlickerScreen
 import uz.monitorcheck.ui.home.HomeScreen
+import uz.monitorcheck.ui.screen.ScreenTestScreen
 import uz.monitorcheck.ui.theme.MonitorCheckTheme
 
 class MainActivity : ComponentActivity() {
@@ -28,10 +29,13 @@ fun MonitorCheckApp() {
     val nav = rememberNavController()
     NavHost(navController = nav, startDestination = "home") {
         composable("home") {
-            HomeScreen(onOpenFlicker = { nav.navigate("flicker") })
+            HomeScreen(onOpenFlicker = { nav.navigate("flicker") }, onOpenScreen = { nav.navigate("screen") })
         }
         composable("flicker") {
             FlickerScreen(onBack = { nav.popBackStack() })
+        }
+        composable("screen") {
+            ScreenTestScreen(onBack = { nav.popBackStack() })
         }
     }
 }

@@ -23,18 +23,30 @@ import uz.monitorcheck.analysis.flicker.FlickerMeasurement
 import uz.monitorcheck.analysis.flicker.FrameResult
 import uz.monitorcheck.analysis.flicker.RowTiming
 import uz.monitorcheck.analysis.standards.Ieee1789
-import uz.monitorcheck.analysis.standards.Ieee1789Assessment
 import uz.monitorcheck.camera.CameraConfig
 import uz.monitorcheck.camera.CameraFrame
 import uz.monitorcheck.camera.CaptureSettings
 import uz.monitorcheck.camera.FlickerCamera
 import uz.monitorcheck.data.CalibrationStore
+import uz.monitorcheck.data.FlickerReport
+import uz.monitorcheck.data.SessionRepository
+import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlin.math.roundToLong
 
 enum class FlickerMode { AIMING, MEASURING, CALIBRATING, RESULT, CALIBRATION_RESULT }
+
+/** Ekspozitsiyani boshqarish holati. */
+enum class ExposureControl {
+    /** Qo'lda ekspozitsiya sinab ko'rilmoqda (qurilma so'ralgan qiymatni bajaradimi). */
+    PROBING,
+    /** Qo'lda ekspozitsiya ishlaydi (tekshirildi). */
+    MANUAL,
+    /** Faqat avtomatik ekspozitsiya — qisqa ekspozitsiya kafolatlanmaydi. */
+    AUTO,
+}
 
 class LiveState(
     /** Qator profili (nisbiy, o'rtacha = 1), grafik uchun qisqartirilgan. */
@@ -44,22 +56,15 @@ class LiveState(
     val frame: FrameResult?,
 )
 
-data class FlickerReport(
-    val measurement: FlickerMeasurement,
-    val assessment: Ieee1789Assessment,
-    val exposureSec: Double?,
-    val iso: Int?,
-    val rows: Int,
-    /** Natija ikkinchi ekspozitsiyada olinganmi. */
-    val fromPassB: Boolean,
-)
-
 data class FlickerUiState(
     val config: CameraConfig? = null,
     val noCamera: Boolean = false,
     val error: String? = null,
     val mode: FlickerMode = FlickerMode.AIMING,
-    val settings: CaptureSettings? = null,
+    val control: ExposureControl = ExposureControl.PROBING,
+    /** Kadr natijasidagi HAQIQIY ekspozitsiya va ISO. */
+    val actualExposureNs: Long? = null,
+    val actualIso: Int? = null,
     val live: LiveState? = null,
     val timing: RowTiming = RowTiming.UNKNOWN,
     val skewTRowSec: Double? = null,
@@ -75,10 +80,12 @@ data class FlickerUiState(
 
 /**
  * Miltillash o'lchovi jarayoni:
- *  AIMING      — jonli ko'rinish, avtomatik ISO tanlash (ekspozitsiya qisqa ushlab turiladi);
- *  MEASURING   — sozlamalar qotiriladi, A o'tish: [FRAMES] kadr; miltillash topilmasa,
- *                B o'tish boshqa ekspozitsiyada (f ≈ k/T_e "ko'r nuqta"larini istisno qilish uchun);
- *  CALIBRATING — 100 Hz lampa bo'yicha t_row ni aniqlash.
+ *  PROBING     — qo'lda ekspozitsiya so'raladi va kadr natijasidagi haqiqiy qiymat bilan
+ *                solishtiriladi (ba'zi qurilmalar MANUAL_SENSOR e'lon qilmasa ham bajaradi,
+ *                ba'zilari e'lon qilib ham bajarmaydi);
+ *  AIMING      — jonli ko'rinish, avtomatik ISO;
+ *  MEASURING   — A o'tish: [FRAMES] kadr; miltillash topilmasa — B o'tish boshqa ekspozitsiyada;
+ *  CALIBRATING — 100 Hz lampa bo'yicha t_row.
  */
 class FlickerViewModel(app: Application) : AndroidViewModel(app) {
 
@@ -86,6 +93,7 @@ class FlickerViewModel(app: Application) : AndroidViewModel(app) {
         const val FRAMES = 24
         const val CALIB_FRAMES = 30
         private const val SKIP_AFTER_LOCK = 2
+        private const val PROBE_FRAMES = 6
     }
 
     private val store = CalibrationStore(app)
@@ -97,8 +105,6 @@ class FlickerViewModel(app: Application) : AndroidViewModel(app) {
 
     private var camera: FlickerCamera? = null
     private var collectJob: Job? = null
-
-    /** Kadrlar fon oqimida, tugmalar asosiy oqimda — umumiy holat shu qulf bilan himoyalanadi. */
     private val mutex = Mutex()
 
     private fun locked(block: () -> Unit) {
@@ -111,6 +117,7 @@ class FlickerViewModel(app: Application) : AndroidViewModel(app) {
     private val collected = ArrayList<Pair<CameraFrame, FrameResult>>()
     private var passAResult: FlickerMeasurement? = null
     private var calibrationRef = 100.0
+    private val probeExposures = ArrayList<Long>()
 
     init {
         val cfg = try {
@@ -122,6 +129,7 @@ class FlickerViewModel(app: Application) : AndroidViewModel(app) {
             it.copy(
                 config = cfg,
                 noCamera = cfg == null,
+                control = if (cfg?.aeOffSupported == true) ExposureControl.PROBING else ExposureControl.AUTO,
                 calibratedTRowSec = cfg?.let { c -> store.tRowSec(c.calibrationKey) },
                 useCalibration = store.useCalibration,
             )
@@ -135,10 +143,10 @@ class FlickerViewModel(app: Application) : AndroidViewModel(app) {
         if (camera != null) return
         val cam = FlickerCamera(getApplication(), cfg)
         camera = cam
+        probeExposures.clear()
         collectJob = viewModelScope.launch(Dispatchers.Default) {
             try {
                 cam.open(surface)
-                _state.update { it.copy(settings = cam.settings, error = null) }
                 cam.frames.collect { f -> mutex.withLock { onFrame(cam, f) } }
             } catch (e: Exception) {
                 _state.update { it.copy(error = e.message ?: e.toString()) }
@@ -156,14 +164,13 @@ class FlickerViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    override fun onCleared() {
-        onSurfaceDestroyed()
-    }
+    override fun onCleared() = onSurfaceDestroyed()
 
     // ---- Foydalanuvchi amallari ---------------------------------------------------------
 
     fun startMeasurement() = locked {
         val cam = camera ?: return@locked
+        if (_state.value.control == ExposureControl.PROBING) return@locked
         collected.clear()
         passAResult = null
         lockedSettingsId = cam.currentSettingsId
@@ -177,14 +184,11 @@ class FlickerViewModel(app: Application) : AndroidViewModel(app) {
         collected.clear()
         skipped = 0
         _state.update {
-            it.copy(mode = FlickerMode.CALIBRATING, progress = 0, progressTotal = CALIB_FRAMES,
-                calibration = null, calibrationFailed = false)
+            it.copy(mode = FlickerMode.CALIBRATING, progress = 0, progressTotal = CALIB_FRAMES, calibration = null, calibrationFailed = false)
         }
     }
 
-    fun backToAiming() = locked {
-        _state.update { it.copy(mode = FlickerMode.AIMING) }
-    }
+    fun backToAiming() = locked { _state.update { it.copy(mode = FlickerMode.AIMING) } }
 
     fun clearCalibration() {
         val cfg = _state.value.config ?: return
@@ -216,36 +220,57 @@ class FlickerViewModel(app: Application) : AndroidViewModel(app) {
         frameCounter++
         val (timing, skewT) = currentTiming(frame)
         val expSec = frame.exposureNs?.let { it * 1e-9 }
+        _state.update { it.copy(actualExposureNs = frame.exposureNs, actualIso = frame.iso, timing = timing, skewTRowSec = skewT) }
+
+        if (_state.value.control == ExposureControl.PROBING) {
+            probe(cam, frame)
+            return
+        }
         when (_state.value.mode) {
             FlickerMode.AIMING, FlickerMode.RESULT, FlickerMode.CALIBRATION_RESULT -> {
                 autoExpose(cam, frame)
                 val fr = if (frameCounter % 3 == 0 && _state.value.mode == FlickerMode.AIMING)
                     analyzer.analyzeFrame(frame.profile, timing, expSec) else null
                 _state.update {
-                    it.copy(
-                        timing = timing,
-                        skewTRowSec = skewT,
-                        settings = cam.settings,
-                        live = LiveState(downsample(frame.profile.values), frame.profile.meanCode,
-                            frame.profile.saturatedFraction, fr ?: it.live?.frame),
-                    )
+                    it.copy(live = LiveState(downsample(frame.profile.values), frame.profile.meanCode,
+                        frame.profile.saturatedFraction, fr ?: it.live?.frame))
                 }
             }
-
             FlickerMode.MEASURING -> {
                 if (frame.settingsId != lockedSettingsId) return
                 if (skipped < SKIP_AFTER_LOCK) { skipped++; return }
                 collected += frame to analyzer.analyzeFrame(frame.profile, timing, expSec)
-                _state.update { it.copy(progress = collected.size, timing = timing, skewTRowSec = skewT) }
+                _state.update { it.copy(progress = collected.size) }
                 if (collected.size >= FRAMES) finishPass(cam, timing)
             }
-
             FlickerMode.CALIBRATING -> {
                 autoExpose(cam, frame)
                 collected += frame to calibAnalyzer.analyzeFrame(frame.profile, RowTiming.UNKNOWN, expSec)
-                _state.update { it.copy(progress = collected.size, skewTRowSec = skewT) }
+                _state.update { it.copy(progress = collected.size) }
                 if (collected.size >= CALIB_FRAMES) finishCalibration(skewT)
             }
+        }
+    }
+
+    /**
+     * Qo'lda ekspozitsiya haqiqatan bajariladimi: so'ralgan T_e va kadr natijasidagi
+     * SENSOR_EXPOSURE_TIME ±30% ichida bo'lsa — MANUAL, aks holda AUTO rejimga o'tiladi.
+     */
+    private fun probe(cam: FlickerCamera, frame: CameraFrame) {
+        if (frame.settingsId != cam.currentSettingsId) return
+        frame.exposureNs?.let { probeExposures += it }
+        _state.update {
+            it.copy(live = LiveState(downsample(frame.profile.values), frame.profile.meanCode, frame.profile.saturatedFraction, null))
+        }
+        if (probeExposures.size < PROBE_FRAMES && frame.exposureNs != null) return
+        val med = if (probeExposures.isEmpty()) null else Stats.median(probeExposures.map { it.toDouble() }.toDoubleArray())
+        val req = cam.settings.exposureNs.toDouble()
+        val ok = med != null && abs(med - req) / req < 0.3
+        if (ok) {
+            _state.update { it.copy(control = ExposureControl.MANUAL) }
+        } else {
+            cam.apply(cam.settings.copy(manual = false))
+            _state.update { it.copy(control = ExposureControl.AUTO) }
         }
     }
 
@@ -254,9 +279,11 @@ class FlickerViewModel(app: Application) : AndroidViewModel(app) {
         val expSec = medianExposure()
         val m = analyzer.combine(frames, timing, expSec, cam.response)
         val st = _state.value
+        val manual = st.control == ExposureControl.MANUAL
 
-        if (!m.detected && !st.passB && cam.settings.manual) {
-            // B o'tish: ekspozitsiyani ~0.6× (yoki imkon bo'lmasa ~1.6×) o'zgartirib qayta o'lchash
+        if (!m.detected && !st.passB && manual) {
+            // B o'tish: ekspozitsiyani ~0.6× (imkon bo'lmasa ~1.6×) o'zgartirib — f ≈ k/T_e "ko'r
+            // nuqta"lari ikkinchi ekspozitsiyada boshqa joyga tushadi.
             passAResult = m
             val s = cam.settings
             val range = cam.config.exposureRangeNs
@@ -268,14 +295,17 @@ class FlickerViewModel(app: Application) : AndroidViewModel(app) {
             lockedSettingsId = cam.currentSettingsId
             skipped = 0
             collected.clear()
-            _state.update { it.copy(passB = true, progress = 0, settings = cam.settings) }
+            _state.update { it.copy(passB = true, progress = 0) }
             return
         }
 
         val a = passAResult
         val final = when {
             m.detected -> m
-            a != null -> a.copy(detectionLimitPct = max(a.detectionLimitPct, m.detectionLimitPct))
+            a != null -> a.copy(
+                detectionLimitPct = max(a.detectionLimitPct, m.detectionLimitPct),
+                coverageHz = listOfNotNull(a.coverageHz, m.coverageHz).maxOrNull(),
+            )
             else -> m
         }
         val assess = Ieee1789.assess(
@@ -285,6 +315,7 @@ class FlickerViewModel(app: Application) : AndroidViewModel(app) {
             modHighPct = final.modulationPct?.high?.takeIf { !it.isNaN() },
             fLowHz = final.frequencyHz?.low?.takeIf { !it.isNaN() },
             fHighHz = final.frequencyHz?.high?.takeIf { !it.isNaN() },
+            coverageHz = final.coverageHz,
         )
         val report = FlickerReport(
             measurement = final,
@@ -293,8 +324,10 @@ class FlickerViewModel(app: Application) : AndroidViewModel(app) {
             iso = collected.lastOrNull()?.first?.iso,
             rows = collected.lastOrNull()?.first?.rows ?: 0,
             fromPassB = st.passB && m.detected,
+            manualExposure = manual,
         )
         collected.clear()
+        SessionRepository.setFlicker(report)
         _state.update { it.copy(mode = FlickerMode.RESULT, report = report) }
     }
 
@@ -305,20 +338,16 @@ class FlickerViewModel(app: Application) : AndroidViewModel(app) {
         if (res != null && cfg != null) {
             store.save(cfg.calibrationKey, res.tRow.mean)
             _state.update {
-                it.copy(mode = FlickerMode.CALIBRATION_RESULT, calibration = res, calibrationFailed = false,
-                    calibratedTRowSec = res.tRow.mean)
+                it.copy(mode = FlickerMode.CALIBRATION_RESULT, calibration = res, calibrationFailed = false, calibratedTRowSec = res.tRow.mean)
             }
         } else {
             _state.update { it.copy(mode = FlickerMode.CALIBRATION_RESULT, calibration = null, calibrationFailed = true) }
         }
     }
 
-    // ---- Avtomatik ISO ------------------------------------------------------------------
+    // ---- Avtomatik ISO (qo'lda rejimda) -----------------------------------------------------
 
-    /**
-     * Qo'lda rejimda yorqinlikni ushlab turish: ekspozitsiya qisqa qoladi (sinc susayishi kichik
-     * bo'lishi uchun), asosan ISO o'zgartiriladi. Maqsad — o'rtacha kod ≈ 0.45, to'yinish < 0.3%.
-     */
+    /** Ekspozitsiya qisqa qoladi (≤ 1/5000 s — qamrov ≥ 3 kHz), yorqinlik asosan ISO bilan. */
     private fun autoExpose(cam: FlickerCamera, frame: CameraFrame) {
         val s = cam.settings
         if (!s.manual || frame.settingsId != cam.currentSettingsId || frameCounter % 3 != 0) return
@@ -341,7 +370,7 @@ class FlickerViewModel(app: Application) : AndroidViewModel(app) {
             exp = min((exp * iso.toDouble() / isoR.upper).roundToLong(), CameraConfig.MAX_EXPOSURE_NS)
             iso = isoR.upper
         }
-        if (iso != s.iso || exp != s.exposureNs) cam.apply(s.copy(exposureNs = exp, iso = iso))
+        if (iso != s.iso || exp != s.exposureNs) cam.apply(CaptureSettings(true, exp, iso))
     }
 
     private fun clampIso(cam: FlickerCamera, iso: Int): Int =

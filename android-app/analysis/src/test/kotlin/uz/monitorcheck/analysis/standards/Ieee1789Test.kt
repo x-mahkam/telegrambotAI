@@ -41,7 +41,10 @@ class Ieee1789Test {
 
     @Test
     fun `assess handles not detected and unknown frequency`() {
-        assertEquals(Ieee1789Level.NO_FLICKER_DETECTED, Ieee1789.assess(false, 500.0, 1.0).level)
+        assertEquals(Ieee1789Level.NO_FLICKER_DETECTED, Ieee1789.assess(false, 500.0, 1.0, coverageHz = 4800.0).level)
+        // 1/100 s ekspozitsiya: qamrov 0.6034/0.01 = 60 Hz — "miltillash yo'q" deb bo'lmaydi
+        assertEquals(Ieee1789Level.INCONCLUSIVE, Ieee1789.assess(false, null, null, coverageHz = 60.3).level)
+        assertEquals(Ieee1789Level.INCONCLUSIVE, Ieee1789.assess(false, null, null, coverageHz = null).level)
         assertEquals(Ieee1789Level.FREQUENCY_UNKNOWN, Ieee1789.assess(true, null, 30.0).level)
     }
 
