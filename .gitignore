@@ -25,3 +25,4 @@ Thumbs.db
 test-page/tools/out/
 .pytest_cache/
 .ruff_cache/
+.kotlin/

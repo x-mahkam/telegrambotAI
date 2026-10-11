@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Interfeys matnlari — oʻzbek tili (lotin). Standart til.
+  Oʻzbek lotin alifbosidagi oʻ, gʻ harflari uchun U+02BB (ʻ), tutuq belgisi uchun U+02BC (ʼ)
+  ishlatiladi — Android resurslarida ASCII apostrofni ekranlash shart emas.
+  Rus tili: values-ru/strings.xml (xuddi shu kalitlar).
+-->
+<resources>
+    <string name="app_name">MonitorCheck</string>
+
+    <!-- Bosh ekran -->
+    <string name="home_title">Monitor sifatini tekshirish</string>
+    <string name="home_subtitle">Ergonomik koʻrsatkichlar va standartlarga muvofiqlik</string>
+    <string name="module_flicker">Miltillash (PWM)</string>
+    <string name="module_flicker_desc">Yoritish modulyatsiyasi chastotasi va chuqurligi, IEEE 1789-2015 boʻyicha baholash</string>
+    <string name="module_pixels">Oʻlik piksel va bir tekislik</string>
+    <string name="module_pixels_desc">Nuqsonli piksellar, 3×3 zona boʻyicha yorqinlik farqi, gradient pogʻonalari</string>
+    <string name="module_edid">EDID maʼlumoti (QR)</string>
+    <string name="module_edid_desc">Kompyuterdagi EDID oʻquvchi dasturi yaratgan QR-kodni skanerlash</string>
+    <string name="module_report">PDF hisobot</string>
+    <string name="module_report_desc">Barcha natijalar, umumiy xulosa va usul cheklovlari</string>
+    <string name="module_spectrum">Spektr (ixtiyoriy)</string>
+    <string name="module_spectrum_desc">Difraksion panjara bilan nisbiy spektr, koʻk nur ulushi</string>
+    <string name="coming_soon">Keyingi bosqichda</string>
+    <string name="disclaimer">Natijalar ekranning ergonomik koʻrsatkichlari va ularning standartlarga muvofiqligi haqida maʼlumot beradi. Bu tibbiy xulosa emas.</string>
+
+    <!-- Ruxsatlar -->
+    <string name="perm_camera_title">Kamera ruxsati kerak</string>
+    <string name="perm_camera_text">Miltillashni oʻlchash uchun telefon kamerasidan foydalaniladi. Tasvirlar saqlanmaydi va hech qayerga yuborilmaydi.</string>
+    <string name="perm_grant">Ruxsat berish</string>
+
+    <!-- Miltillash ekrani -->
+    <string name="flicker_title">Miltillash (PWM) oʻlchovi</string>
+    <string name="back">Orqaga</string>
+    <string name="howto_title">Qanday oʻlchanadi</string>
+    <string name="howto_1">1. Tekshirilayotgan kompyuterda test sahifasini oching va 10-testni (oq maydon, «0» tugmasi) tanlang.</string>
+    <string name="howto_2" formatted="false">2. Monitor menyusidan (OSD) yorqinlikni 20–30% ga tushiring — PWM odatda past yorqinlikda kuchli boʻladi.</string>
+    <string name="howto_3">3. Telefonni ekranga 5–15 sm masofada, ekranga parallel tuting: kadr toʻliq oq maydon bilan toʻlsin.</string>
+    <string name="howto_4">4. Kamera ataylab fokusdan chiqariladi (piksel toʻri koʻrinmasligi uchun) — tasvir xira boʻlishi normal.</string>
+    <string name="howto_5">5. «Oʻlchash» tugmasini bosing va telefonni 3–5 soniya qimirlatmay turing.</string>
+
+    <string name="camera_info">Kamera: %1$s · tasvir %2$d×%3$d · %4$s</string>
+    <string name="camera_manual">qoʻlda ekspozitsiya</string>
+    <string name="camera_auto">avtomatik ekspozitsiya</string>
+    <string name="timing_skew">t_row = %1$.2f µs (sensor skew)</string>
+    <string name="timing_calibrated">t_row = %1$.2f µs (kalibrovka)</string>
+    <string name="timing_unknown">t_row nomaʼlum</string>
+    <string name="warn_no_skew">Bu qurilma SENSOR_ROLLING_SHUTTER_SKEW maʼlumotini bermaydi. Chastotani oʻlchash uchun kalibrovka qiling (100 Hz tarmoq lampasi), aks holda faqat «miltillash bor/yoʻq» xulosasi beriladi.</string>
+    <string name="warn_no_manual">Qurilma qoʻlda ekspozitsiyani qoʻllab-quvvatlamaydi: avtomatik rejim ishlatiladi, natija aniqligi past boʻlishi mumkin.</string>
+    <string name="exposure_info">Ekspozitsiya 1/%1$d s · ISO %2$d · darajasi %3$d%%</string>
+
+    <string name="live_title">Jonli koʻrinish</string>
+    <string name="live_flicker">Taxminan %1$s Hz, modulyatsiya ~%2$.0f%%</string>
+    <string name="live_flicker_nofreq">Miltillash koʻrinmoqda, modulyatsiya ~%1$.0f%%</string>
+    <string name="live_none">Miltillash koʻrinmayapti</string>
+    <string name="live_waiting">Kamera ishga tushmoqda…</string>
+    <string name="live_too_dark">Tasvir juda qorongʻi — ekranga yaqinroq tuting</string>
+    <string name="live_saturated">Tasvir toʻyingan — ISO avtomatik kamaytirilmoqda</string>
+
+    <string name="btn_measure">Oʻlchash</string>
+    <string name="btn_calibrate">Kalibrovka (100 Hz lampa)</string>
+    <string name="btn_again">Qayta oʻlchash</string>
+    <string name="btn_done">Tayyor</string>
+    <string name="measuring">Oʻlchanmoqda: %1$d / %2$d kadr</string>
+    <string name="measuring_pass_b">Ikkinchi oʻlchov (boshqa ekspozitsiya): %1$d / %2$d kadr</string>
+    <string name="calibrating">Kalibrovka: %1$d / %2$d kadr</string>
+
+    <!-- Natija -->
+    <string name="result_title">Natija</string>
+    <string name="result_frequency">Chastota</string>
+    <string name="result_modulation">Modulyatsiya chuqurligi</string>
+    <string name="result_duty">PWM toʻldirish koeffitsienti</string>
+    <string name="result_value_ci">%1$s ± %2$s</string>
+    <string name="result_not_measured">aniqlanmadi</string>
+    <string name="result_frames">Kadrlar: %1$d dan %2$d tasida miltillash topildi, %3$d tasi hisobda</string>
+    <string name="result_model_pwm">Toʻlqin modeli: toʻgʻri burchakli PWM</string>
+    <string name="result_model_harmonic">Toʻlqin modeli: garmonik qator</string>
+    <string name="result_limit">Aniqlash chegarasi: ~%1$.1f%%</string>
+    <string name="result_conditions">Shartlar: ekspozitsiya 1/%1$d s, ISO %2$d, %3$d qator, %4$s</string>
+    <string name="result_pass_b">Natija ikkinchi ekspozitsiyada (1/%1$d s) olingan.</string>
+    <string name="ci_note">± — 95% ishonch oraligʻi (Styudent taqsimoti)</string>
+
+    <string name="ieee_title">IEEE 1789-2015 boʻyicha baholash</string>
+    <string name="ieee_no_flicker">Miltillash aniqlanmadi</string>
+    <string name="ieee_no_flicker_desc">Modulyatsiya aniqlash chegarasidan (~%1$.1f%%) past. Ekran amalda miltillamaydi (flicker-free).</string>
+    <string name="ieee_noel">Taʼsir kuzatilmaydigan zona (NOEL)</string>
+    <string name="ieee_noel_desc">Modulyatsiya %1$.1f%% &lt; NOEL chegarasi %2$s.</string>
+    <string name="ieee_low">Past xavf zonasi</string>
+    <string name="ieee_low_desc">Modulyatsiya NOEL chegarasidan (%1$s) yuqori, lekin past xavf chegarasidan (%2$s) past.</string>
+    <string name="ieee_high">Tavsiya chegarasidan tashqarida (yuqori xavf zonasi)</string>
+    <string name="ieee_high_desc">Modulyatsiya %1$.1f%% ≥ past xavf chegarasi %2$s.</string>
+    <string name="ieee_unknown">Miltillash bor, chastota nomaʼlum</string>
+    <string name="ieee_unknown_desc">t_row maʼlum emas — standart boʻyicha baholash uchun kalibrovka qiling.</string>
+    <string name="ieee_borderline">Natija chegaraga yaqin: ishonch oraligʻi qoʻshni zonaga oʻtadi. Ekspert tekshiruvi tavsiya etiladi.</string>
+    <string name="no_limit">cheklov yoʻq</string>
+    <string name="chart_noel">NOEL</string>
+    <string name="chart_low_risk">Past xavf</string>
+
+    <string name="warnings_title">Ogohlantirishlar</string>
+    <string name="w_no_timing">Qator vaqti (t_row) nomaʼlum — chastota hisoblanmadi.</string>
+    <string name="w_no_exposure">Ekspozitsiya vaqti nomaʼlum — sinc tuzatish qoʻllanmadi, modulyatsiya kamroq baholangan boʻlishi mumkin.</string>
+    <string name="w_low_sinc">Ekspozitsiya miltillash davriga nisbatan uzun — modulyatsiya bahosi ishonchsiz.</string>
+    <string name="w_static_phase">Barcha kadrlarda faza bir xil: bu ekran piksel toʻrining moiré naqshi boʻlishi mumkin. Telefonni biroz uzoqlashtirib, qayta oʻlchang.</string>
+    <string name="w_inconsistent">Kadrlar boʻyicha chastota mos kelmadi — telefonni qimirlatmay qayta oʻlchang.</string>
+    <string name="w_few_cycles">Kadrda sikllar kam — past chastota aniqligi pasaygan.</string>
+    <string name="w_saturated">Tasvirning bir qismi toʻyingan — modulyatsiya kamroq baholangan boʻlishi mumkin.</string>
+    <string name="w_too_dark">Tasvir qorongʻi — shovqin yuqori.</string>
+    <string name="w_nonlinear">Kamera javobini chiziqlashtirib boʻlmadi (sRGB taxmini) — modulyatsiya taxminiy.</string>
+    <string name="w_few_frames">Kadrlar soni kam — ishonch oraligʻi keng.</string>
+
+    <string name="limits_title">Usul cheklovlari</string>
+    <string name="limits_text">Oʻlchov telefon kamerasining «rolling shutter» effektiga asoslangan: kadr qatorlari ketma-ket vaqtlarda ekspozitsiyalanadi, shuning uchun miltillash gorizontal polosalar koʻrinishida qayd etiladi (f = ν / t_row). Aniqlik t_row qiymatiga bogʻliq (sensor maʼlumoti yoki kalibrovka). Oʻlchanadigan eng yuqori chastota ≈ 1/(2·t_row); ekspozitsiya davri T_e ga karrali chastotalar (f ≈ k/T_e) koʻrinmaydi — shuning uchun miltillash topilmasa, ikkinchi ekspozitsiyada qayta oʻlchanadi. Natija laboratoriya fotometri bilan oʻlchovning oʻrnini bosmaydi; chegaraviy holatlarda ekspert tekshiruvi tavsiya etiladi.</string>
+
+    <!-- Kalibrovka -->
+    <string name="calib_title">Kalibrovka (tarmoq lampasi)</string>
+    <string name="calib_howto">Kamerani 50 Hz tarmoqqa ulangan oddiy lampa (LED yoki lyuminessent) yoritgan oq devor yoki qogʻozga qarating. Bunday lampa yorugʻligi 100 Hz da tebranadi. Monitor yorugʻligi kadrga tushmasin.</string>
+    <string name="calib_ref_100">100 Hz (50 Hz tarmoq)</string>
+    <string name="calib_ref_120">120 Hz (60 Hz tarmoq)</string>
+    <string name="calib_result">t_row = %1$.3f ± %2$.3f µs (%3$d kadr)</string>
+    <string name="calib_deviation">Sensor skew qiymatidan farqi: %1$+.1f%%</string>
+    <string name="calib_failed">Kalibrovka muvaffaqiyatsiz: lampa miltillashi aniqlanmadi. Boshqa lampa bilan urinib koʻring yoki kamerani yaqinroq tuting.</string>
+    <string name="calib_saved">Kalibrovka saqlandi va keyingi oʻlchovlarda ishlatiladi.</string>
+    <string name="calib_clear">Kalibrovkani oʻchirish</string>
+    <string name="calib_use">Kalibrovkadan foydalanish</string>
+
+    <string name="error_camera">Kamera xatosi: %1$s</string>
+    <string name="error_no_camera">Mos orqa kamera topilmadi.</string>
+</resources>
